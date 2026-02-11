@@ -117,7 +117,7 @@ function parseFilterMode(value: string | null): FilterMode {
   ) {
     return value;
   }
-  return "root";
+  return "all";
 }
 
 function getDefaultComponentId(components: ComponentSummary[]): string {
@@ -152,7 +152,7 @@ function buildExplorerQueryString({
   if (viewMode !== "explorer") {
     params.set("view", viewMode);
   }
-  if (filterMode !== "root") {
+  if (filterMode !== "all") {
     params.set("filter", filterMode);
   }
   if (search) {
@@ -1409,7 +1409,12 @@ export function ExplorerApp() {
               className="search"
               placeholder="Search object names, fields, documentation, enumerations"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setViewMode((current) =>
+                  current === "tree" ? "explorer" : current
+                );
+              }}
             />
 
             {viewMode === "explorer" && (
