@@ -75,6 +75,7 @@ code,
 .top-controls button,
 .toggle-row button,
 .component-card,
+.component-tree-shortcut,
 .link-btn,
 .tree-node-btn,
 .tree-toggle,
@@ -218,11 +219,40 @@ code,
   gap: 8px;
 }
 
+.component-card-frame {
+  position: relative;
+}
+
 .component-card {
   text-align: left;
-  padding: 10px;
+  width: 100%;
+  padding: 10px 50px 10px 10px;
   display: grid;
   gap: 5px;
+}
+
+.component-tree-shortcut {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 34px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.component-tree-shortcut:hover {
+  background: #f4f8fc;
+}
+
+.component-tree-shortcut.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .component-card strong {
@@ -293,7 +323,15 @@ code,
   gap: 8px;
 }
 
-.tree-view h3 {
+.tree-sticky-info {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.tree-sticky-info h3 {
   margin: 2px 0 2px;
 }
 

@@ -976,6 +976,11 @@ export function ExplorerApp() {
     });
   }
 
+  function openComponentTree(componentId: string): void {
+    navigateTo(componentId, true, true);
+    setViewMode("tree");
+  }
+
   function handleRightPaneClickCapture(): void {
     setViewMode((current) => (current === "explorer" ? "tree" : current));
   }
@@ -1451,6 +1456,69 @@ export function ExplorerApp() {
                 </button>
               </div>
             )}
+
+            {viewMode === "tree" && treeRoot && (
+              <div className="tree-sticky-info">
+                <h3>{treeRoot.name}</h3>
+                <div className="tree-actions">
+                  <button onClick={expandAllTreeNodes}>Expand all</button>
+                  <button onClick={collapseAllTreeNodes}>Collapse all</button>
+                </div>
+
+                <div className="breadcrumbs" aria-label="tree-breadcrumbs">
+                  {treeBreadcrumbs.map((crumb, index) => {
+                    const isActive =
+                      activeTreeNode?.path === crumb.path ||
+                      (!activeTreeNode && crumb.path === treeRoot.name);
+                    return (
+                      <span key={`${crumb.path}-${index}`} className="crumb-wrap">
+                        {index > 0 && <span className="crumb-sep">/</span>}
+                        {crumb.nodeId ? (
+                          <button
+                            className={`crumb-btn ${isActive ? "active" : ""}`}
+                            onClick={() => {
+                              if (crumb.nodeId === treeModel?.rootId) {
+                                setActiveTreeFieldId("");
+                                navigateTo(treeRoot.id, true, false);
+                                return;
+                              }
+                              if (crumb.nodeId) selectTreeNode(crumb.nodeId);
+                            }}
+                          >
+                            {crumb.label}
+                          </button>
+                        ) : (
+                          <span className="crumb">{crumb.label}</span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                {activeTreeNode &&
+                  activeTreeNode.type !== "root" &&
+                  activeTreeContext && (
+                    <div className="tree-meta">
+                      <strong>{activeTreeNode.name}</strong>
+                      <span className="muted">{activeTreeNode.occurrence}</span>
+                      <TypeReferenceLink
+                        raw={activeTreeNode.rawTypeOrRef}
+                        resolution={activeTreeNode.resolution}
+                        current={activeTreeContext}
+                        componentsById={componentsById}
+                        onSelect={(id) => navigateTo(id, true, false)}
+                        variantById={variantById}
+                      />
+                      {activeTreeNodeHasInlineChildren &&
+                        activeTreeNode.rawTypeOrRef && (
+                          <span className="muted">
+                            Inherits this type and adds inline fields below.
+                          </span>
+                        )}
+                    </div>
+                  )}
+              </div>
+            )}
           </div>
 
           {viewMode === "explorer" ? (
@@ -1465,36 +1533,52 @@ export function ExplorerApp() {
                       );
                       const variant = variantById[component.id];
                       return (
-                        <button
-                          key={component.id}
-                          className={`component-card ${
-                            detailComponentId === component.id ? "active" : ""
-                          }`}
-                          onClick={() => navigateTo(component.id, true, true)}
-                        >
-                          <div className="component-card-top">
-                            <span
-                              className={`kind-badge kind-${component.kind}`}
-                            >
-                              {kindLabel[component.kind]}
-                            </span>
-                            {variant && variant.total > 1 && (
-                              <span className="variant-pill">
-                                Variant {variant.position}/{variant.total}
+                        <div key={component.id} className="component-card-frame">
+                          <button
+                            type="button"
+                            className={`component-card ${
+                              detailComponentId === component.id ? "active" : ""
+                            }`}
+                            onClick={() => navigateTo(component.id, true, true)}
+                          >
+                            <div className="component-card-top">
+                              <span
+                                className={`kind-badge kind-${component.kind}`}
+                              >
+                                {kindLabel[component.kind]}
                               </span>
-                            )}
-                          </div>
-                          <strong>{component.name}</strong>
-                          <small>
-                            {component.elementFields.length} element field(s),{" "}
-                            {component.attributeFields.length} attribute(s)
-                          </small>
-                          {restrictionSummary && (
-                            <small className="muted">
-                              {restrictionSummary}
+                              {variant && variant.total > 1 && (
+                                <span className="variant-pill">
+                                  Variant {variant.position}/{variant.total}
+                                </span>
+                              )}
+                            </div>
+                            <strong>{component.name}</strong>
+                            <small>
+                              {component.elementFields.length} element field(s),{" "}
+                              {component.attributeFields.length} attribute(s)
                             </small>
-                          )}
-                        </button>
+                            {restrictionSummary && (
+                              <small className="muted">
+                                {restrictionSummary}
+                              </small>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className={`component-tree-shortcut ${
+                              viewMode === "tree" &&
+                              treeRootComponentId === component.id
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() => openComponentTree(component.id)}
+                            aria-label={`Open ${component.name} in tree view`}
+                            title="Open in tree view"
+                          >
+                            Tree
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -1512,72 +1596,6 @@ export function ExplorerApp() {
               {!treeRoot && <p>Select an object to view its tree.</p>}
               {treeRoot && (
                 <>
-                  <h3>{treeRoot.name}</h3>
-                  <div className="tree-actions">
-                    <button onClick={expandAllTreeNodes}>Expand all</button>
-                    <button onClick={collapseAllTreeNodes}>Collapse all</button>
-                  </div>
-
-                  <div className="breadcrumbs" aria-label="tree-breadcrumbs">
-                    {treeBreadcrumbs.map((crumb, index) => {
-                      const isActive =
-                        activeTreeNode?.path === crumb.path ||
-                        (!activeTreeNode && crumb.path === treeRoot.name);
-                      return (
-                        <span
-                          key={`${crumb.path}-${index}`}
-                          className="crumb-wrap"
-                        >
-                          {index > 0 && <span className="crumb-sep">/</span>}
-                          {crumb.nodeId ? (
-                            <button
-                              className={`crumb-btn ${
-                                isActive ? "active" : ""
-                              }`}
-                              onClick={() => {
-                                if (crumb.nodeId === treeModel?.rootId) {
-                                  setActiveTreeFieldId("");
-                                  navigateTo(treeRoot.id, true, false);
-                                  return;
-                                }
-                                if (crumb.nodeId) selectTreeNode(crumb.nodeId);
-                              }}
-                            >
-                              {crumb.label}
-                            </button>
-                          ) : (
-                            <span className="crumb">{crumb.label}</span>
-                          )}
-                        </span>
-                      );
-                    })}
-                  </div>
-
-                  {activeTreeNode &&
-                    activeTreeNode.type !== "root" &&
-                    activeTreeContext && (
-                      <div className="tree-meta">
-                        <strong>{activeTreeNode.name}</strong>
-                        <span className="muted">
-                          {activeTreeNode.occurrence}
-                        </span>
-                        <TypeReferenceLink
-                          raw={activeTreeNode.rawTypeOrRef}
-                          resolution={activeTreeNode.resolution}
-                          current={activeTreeContext}
-                          componentsById={componentsById}
-                          onSelect={(id) => navigateTo(id, true, false)}
-                          variantById={variantById}
-                        />
-                        {activeTreeNodeHasInlineChildren &&
-                          activeTreeNode.rawTypeOrRef && (
-                            <span className="muted">
-                              Inherits this type and adds inline fields below.
-                            </span>
-                          )}
-                      </div>
-                    )}
-
                   {treeModel &&
                     treeModel.nodesById[treeModel.rootId].children.length ===
                       0 && <p className="muted">No sub-fields declared.</p>}
