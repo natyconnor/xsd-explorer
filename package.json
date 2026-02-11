@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 5000",
     "build:data": "python3 scripts/build_xsd_index.py --input .. --output public/data/xsd-index.json",
-    "build": "npm run next build",
+    "build": "next build",
     "start": "next start",
     "export": "npm run build:data && next build",
     "lint": "next lint"
