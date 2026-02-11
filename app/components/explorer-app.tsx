@@ -2,7 +2,7 @@
 
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type {
   AttributeField,
   ComponentKind,
@@ -664,7 +664,6 @@ function TypeReferenceLink({
 }
 
 export function ExplorerApp() {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [index, setIndex] = useState<XsdIndex | null>(null);
@@ -915,7 +914,7 @@ export function ExplorerApp() {
 
     pendingUrlQueryRef.current = nextQuery;
     const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
-    router.replace(nextUrl, { scroll: false });
+    window.history.replaceState(null, '', nextUrl);
   }, [
     activeTreeFieldId,
     detailComponentId,
@@ -923,7 +922,6 @@ export function ExplorerApp() {
     hasHydratedFromUrl,
     index,
     pathname,
-    router,
     search,
     searchParams,
     treeRootComponentId,

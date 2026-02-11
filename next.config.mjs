@@ -4,7 +4,7 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
-  allowedDevOrigins: ['*'],
+  allowedDevOrigins: ['*.replit.dev'],
 };
 
 export default nextConfig;
