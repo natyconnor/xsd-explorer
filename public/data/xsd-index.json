@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-02-11T16:06:04.640209+00:00",
+  "generatedAt": "2026-02-11T18:51:40.494270+00:00",
   "sourceDirectory": "/Users/nathanc/Documents/PMS Docs/2025 Yardi Docs/xsd",
   "summary": {
     "schemaCount": 15,
@@ -6001,8 +6001,17 @@
           "name": "Lease",
           "occurrence": "0..1",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "IdentificationType",
+          "resolution": {
+            "raw": "IdentificationType",
+            "namespace": "",
+            "local": "IdentificationType",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata3.0ils:complextype:identificationtype:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -6084,8 +6093,17 @@
           "name": "CurrentNumberOccupants",
           "occurrence": "0..1",
           "documentation": "Commonly used for actual number of occupants.",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "MITS-Integer",
+          "resolution": {
+            "raw": "MITS-Integer",
+            "namespace": "",
+            "local": "MITS-Integer",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata3.0ils:simpletype:mits-integer:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -8266,8 +8284,17 @@
           "name": "NumberOccupants",
           "occurrence": "0..1",
           "documentation": "Commonly used for maximun number of occupants.",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "MITS-Integer",
+          "resolution": {
+            "raw": "MITS-Integer",
+            "namespace": "",
+            "local": "MITS-Integer",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata3.0ils:simpletype:mits-integer:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -16460,8 +16487,15 @@
           "name": "Value",
           "occurrence": "1..1",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "xs:string",
+          "resolution": {
+            "raw": "xs:string",
+            "namespace": "http://www.w3.org/2001/XMLSchema",
+            "local": "string",
+            "isBuiltin": true,
+            "targetIds": [],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -17025,8 +17059,15 @@
           "name": "EmailAddress",
           "occurrence": "1..unbounded",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "xs:string",
+          "resolution": {
+            "raw": "xs:string",
+            "namespace": "http://www.w3.org/2001/XMLSchema",
+            "local": "string",
+            "isBuiltin": true,
+            "targetIds": [],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -18274,8 +18315,15 @@
           "name": "Rank",
           "occurrence": "0..1",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "xs:integer",
+          "resolution": {
+            "raw": "xs:integer",
+            "namespace": "http://www.w3.org/2001/XMLSchema",
+            "local": "integer",
+            "isBuiltin": true,
+            "targetIds": [],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -19204,8 +19252,17 @@
           "name": "Pets",
           "occurrence": "0..unbounded",
           "documentation": "Details about various prospect pets",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "PetType",
+          "resolution": {
+            "raw": "PetType",
+            "namespace": "",
+            "local": "PetType",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_leadmanagement4.0:complextype:pettype:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -19256,8 +19313,17 @@
           "name": "Customer",
           "occurrence": "1..unbounded",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "PersonType",
+          "resolution": {
+            "raw": "PersonType",
+            "namespace": "",
+            "local": "PersonType",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata4.0:complextype:persontype:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -31903,8 +31969,17 @@
           "name": "MITS-OfferTerm",
           "occurrence": "0..unbounded",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "OfferTermType",
+          "resolution": {
+            "raw": "OfferTermType",
+            "namespace": "",
+            "local": "OfferTermType",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_propertymarketingils4.0:complextype:offertermtype:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -32662,8 +32737,15 @@
           "name": "Rank",
           "occurrence": "0..1",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "xs:integer",
+          "resolution": {
+            "raw": "xs:integer",
+            "namespace": "http://www.w3.org/2001/XMLSchema",
+            "local": "integer",
+            "isBuiltin": true,
+            "targetIds": [],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -32934,8 +33016,17 @@
           "name": "Management",
           "occurrence": "0..unbounded",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "Identification",
+          "resolution": {
+            "raw": "Identification",
+            "namespace": "",
+            "local": "Identification",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata4.0:complextype:identification:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -33036,8 +33127,17 @@
           "name": "Property",
           "occurrence": "1..unbounded",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "Identification",
+          "resolution": {
+            "raw": "Identification",
+            "namespace": "",
+            "local": "Identification",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata4.0:complextype:identification:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -33398,8 +33498,17 @@
           "name": "Building",
           "occurrence": "0..unbounded",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "Identification",
+          "resolution": {
+            "raw": "Identification",
+            "namespace": "",
+            "local": "Identification",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata4.0:complextype:identification:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -33589,8 +33698,17 @@
           "name": "Concession",
           "occurrence": "0..10",
           "documentation": "Active",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "ConcessionType",
+          "resolution": {
+            "raw": "ConcessionType",
+            "namespace": "",
+            "local": "ConcessionType",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_propertymarketingils4.0:complextype:concessiontype:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -33628,8 +33746,17 @@
           "name": "Fee",
           "occurrence": "0..1",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "FeeType",
+          "resolution": {
+            "raw": "FeeType",
+            "namespace": "",
+            "local": "FeeType",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_propertymarketingils4.0:complextype:feetype:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -33733,8 +33860,17 @@
           "name": "Floorplan",
           "occurrence": "1..unbounded",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "Identification",
+          "resolution": {
+            "raw": "Identification",
+            "namespace": "",
+            "local": "Identification",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata4.0:complextype:identification:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -33881,8 +34017,17 @@
           "name": "Fee",
           "occurrence": "0..1",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "FeeType",
+          "resolution": {
+            "raw": "FeeType",
+            "namespace": "",
+            "local": "FeeType",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_propertymarketingils4.0:complextype:feetype:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -34497,8 +34642,17 @@
           "name": "ILS_Unit",
           "occurrence": "0..unbounded",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "Identification",
+          "resolution": {
+            "raw": "Identification",
+            "namespace": "",
+            "local": "Identification",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata4.0:complextype:identification:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -36205,8 +36359,17 @@
           "name": "Phase",
           "occurrence": "0..unbounded",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "Identification",
+          "resolution": {
+            "raw": "Identification",
+            "namespace": "",
+            "local": "Identification",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata4.0:complextype:identification:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -36587,8 +36750,17 @@
           "name": "Pets",
           "occurrence": "0..unbounded",
           "documentation": "Details about various prospect pets",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "PetType",
+          "resolution": {
+            "raw": "PetType",
+            "namespace": "",
+            "local": "PetType",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_propertymarketingils4.0:complextype:pettype:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -36672,8 +36844,17 @@
           "name": "PropertyID",
           "occurrence": "1..1",
           "documentation": "MITS 4.0 PropertyType",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "PropertyType",
+          "resolution": {
+            "raw": "PropertyType",
+            "namespace": "",
+            "local": "PropertyType",
+            "isBuiltin": false,
+            "targetIds": [
+              "schema-itf_mits_coredata4.0:complextype:propertytype:1"
+            ],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],
@@ -39593,8 +39774,15 @@
           "name": "AffordableLease",
           "occurrence": "0..1",
           "documentation": "",
-          "rawTypeOrRef": "",
-          "resolution": null,
+          "rawTypeOrRef": "xs:boolean",
+          "resolution": {
+            "raw": "xs:boolean",
+            "namespace": "http://www.w3.org/2001/XMLSchema",
+            "local": "boolean",
+            "isBuiltin": true,
+            "targetIds": [],
+            "ambiguous": false
+          },
           "restrictions": {
             "base": "",
             "enumerations": [],

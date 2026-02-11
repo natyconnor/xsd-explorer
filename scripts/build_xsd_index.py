@@ -471,6 +471,17 @@ def resolve_optional(
 
 
 def infer_inline_type(node: ET.Element) -> str:
+    complex_selectors = [
+        "./" + xs("complexType") + "/" + xs("complexContent") + "/" + xs("extension"),
+        "./" + xs("complexType") + "/" + xs("complexContent") + "/" + xs("restriction"),
+        "./" + xs("complexType") + "/" + xs("simpleContent") + "/" + xs("extension"),
+        "./" + xs("complexType") + "/" + xs("simpleContent") + "/" + xs("restriction"),
+    ]
+    for selector in complex_selectors:
+        candidate = node.find(selector)
+        if candidate is not None and candidate.get("base"):
+            return candidate.get("base", "")
+
     simple_type = node.find(xs("simpleType"))
     if simple_type is None:
         return ""
