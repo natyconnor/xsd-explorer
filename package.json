@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0 -p 5000",
     "build:data": "python3 scripts/build_xsd_index.py --input .. --output public/data/xsd-index.json",
     "build": "npm run next build",
     "start": "next start",
