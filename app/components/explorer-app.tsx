@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type {
   AttributeField,
   ComponentKind,
@@ -9,10 +10,10 @@ import type {
   ElementField,
   QNameResolution,
   RestrictionInfo,
-  XsdIndex
+  XsdIndex,
 } from "../../lib/xsd-types";
 
-type FilterMode = "all" | "complex" | "simple" | "element";
+type FilterMode = "all" | "root" | "complex" | "simple" | "element";
 type ViewMode = "explorer" | "tree";
 
 type TreeEntry =
@@ -72,16 +73,22 @@ const kindLabel: Record<ComponentKind, string> = {
   simpleType: "Simple type",
   attribute: "Attribute",
   attributeGroup: "Attribute group",
-  group: "Group"
+  group: "Group",
 };
 
 function normalize(value: string): string {
   return value.toLowerCase().trim();
 }
 
-function isVisibleByFilter(component: ComponentSummary, mode: FilterMode): boolean {
+function isVisibleByFilter(
+  component: ComponentSummary,
+  mode: FilterMode
+): boolean {
   if (mode === "all") {
     return true;
+  }
+  if (mode === "root") {
+    return component.usedBy.length === 0;
   }
   if (mode === "complex") {
     return component.kind === "complexType";
@@ -90,6 +97,70 @@ function isVisibleByFilter(component: ComponentSummary, mode: FilterMode): boole
     return component.kind === "simpleType";
   }
   return component.kind === "element";
+}
+
+function parseViewMode(value: string | null): ViewMode {
+  if (value === "tree") {
+    return "tree";
+  }
+  return "explorer";
+}
+
+function parseFilterMode(value: string | null): FilterMode {
+  if (
+    value === "all" ||
+    value === "complex" ||
+    value === "simple" ||
+    value === "element" ||
+    value === "root"
+  ) {
+    return value;
+  }
+  return "root";
+}
+
+function getDefaultComponentId(components: ComponentSummary[]): string {
+  const firstRoot = [...components]
+    .filter((component) => isVisibleByFilter(component, "root"))
+    .sort(compareComponents)[0]?.id;
+  return firstRoot ?? components[0]?.id ?? "";
+}
+
+function buildExplorerQueryString({
+  detailId,
+  treeRootId,
+  viewMode,
+  filterMode,
+  search,
+  activeNodeId,
+}: {
+  detailId: string;
+  treeRootId: string;
+  viewMode: ViewMode;
+  filterMode: FilterMode;
+  search: string;
+  activeNodeId: string;
+}): string {
+  const params = new URLSearchParams();
+  if (detailId) {
+    params.set("component", detailId);
+  }
+  if (treeRootId) {
+    params.set("root", treeRootId);
+  }
+  if (viewMode !== "explorer") {
+    params.set("view", viewMode);
+  }
+  if (filterMode !== "root") {
+    params.set("filter", filterMode);
+  }
+  if (search) {
+    params.set("q", search);
+  }
+  if (activeNodeId) {
+    params.set("node", activeNodeId);
+  }
+  return params.toString();
 }
 
 function summarizeRestrictions(restrictions: RestrictionInfo): string {
@@ -139,7 +210,9 @@ function toAlphaGroup(name: string): string {
   return /[A-Z]/.test(initial) ? initial : "#";
 }
 
-function buildVariantMap(components: ComponentSummary[]): Record<string, VariantMeta> {
+function buildVariantMap(
+  components: ComponentSummary[]
+): Record<string, VariantMeta> {
   const byKey: Record<string, ComponentSummary[]> = {};
   components.forEach((component) => {
     const key = `${component.kind}::${component.name.toLowerCase()}`;
@@ -160,7 +233,7 @@ function buildVariantMap(components: ComponentSummary[]): Record<string, Variant
     ordered.forEach((component, index) => {
       variants[component.id] = {
         position: index + 1,
-        total: ordered.length
+        total: ordered.length,
       };
     });
   });
@@ -177,11 +250,16 @@ function resolveTargetId(
     return null;
   }
 
-  const sameSchema = resolution.targetIds.find((id) => componentsById[id]?.schemaId === current.schemaId);
+  const sameSchema = resolution.targetIds.find(
+    (id) => componentsById[id]?.schemaId === current.schemaId
+  );
   return sameSchema ?? resolution.targetIds[0] ?? null;
 }
 
-function buildDirectTreeModel(component: ComponentSummary, entries: TreeEntry[]): TreeModel {
+function buildDirectTreeModel(
+  component: ComponentSummary,
+  entries: TreeEntry[]
+): TreeModel {
   const rootPath = component.name;
   const rootId = `root:${component.id}`;
 
@@ -198,12 +276,12 @@ function buildDirectTreeModel(component: ComponentSummary, entries: TreeEntry[])
       restrictions: { base: "", enumerations: [], facets: {} },
       parentId: null,
       children: [],
-      contextComponentId: component.id
-    }
+      contextComponentId: component.id,
+    },
   };
 
   const pathToNodeId: Record<string, string> = {
-    [rootPath]: rootId
+    [rootPath]: rootId,
   };
 
   function ensurePath(path: string): string {
@@ -237,7 +315,7 @@ function buildDirectTreeModel(component: ComponentSummary, entries: TreeEntry[])
         restrictions: { base: "", enumerations: [], facets: {} },
         parentId: cursorId,
         children: [],
-        contextComponentId: component.id
+        contextComponentId: component.id,
       };
       nodesById[cursorId].children.push(syntheticId);
       pathToNodeId[cursorPath] = syntheticId;
@@ -256,9 +334,12 @@ function buildDirectTreeModel(component: ComponentSummary, entries: TreeEntry[])
 
   ordered.forEach((entry) => {
     const field = entry.field;
-    const normalizedPath = field.path.startsWith(rootPath) ? field.path : `${rootPath}/${field.path}`;
+    const normalizedPath = field.path.startsWith(rootPath)
+      ? field.path
+      : `${rootPath}/${field.path}`;
     const slashIndex = normalizedPath.lastIndexOf("/");
-    const parentPath = slashIndex > 0 ? normalizedPath.slice(0, slashIndex) : rootPath;
+    const parentPath =
+      slashIndex > 0 ? normalizedPath.slice(0, slashIndex) : rootPath;
     const parentId = ensurePath(parentPath);
 
     const existingAtPath = pathToNodeId[normalizedPath];
@@ -268,7 +349,9 @@ function buildDirectTreeModel(component: ComponentSummary, entries: TreeEntry[])
     if (existingAtPath && existingAtPath.startsWith("synthetic:")) {
       preservedChildren = [...nodesById[existingAtPath].children];
       const parentChildren = nodesById[parentId].children;
-      nodesById[parentId].children = parentChildren.map((childId) => (childId === existingAtPath ? newId : childId));
+      nodesById[parentId].children = parentChildren.map((childId) =>
+        childId === existingAtPath ? newId : childId
+      );
       delete nodesById[existingAtPath];
     }
 
@@ -277,14 +360,15 @@ function buildDirectTreeModel(component: ComponentSummary, entries: TreeEntry[])
       path: normalizedPath,
       name: field.name,
       type: entry.type,
-      occurrence: entry.type === "element" ? entry.field.occurrence : entry.field.use,
+      occurrence:
+        entry.type === "element" ? entry.field.occurrence : entry.field.use,
       rawTypeOrRef: field.rawTypeOrRef,
       resolution: field.resolution,
       documentation: field.documentation,
       restrictions: field.restrictions,
       parentId,
       children: preservedChildren,
-      contextComponentId: component.id
+      contextComponentId: component.id,
     };
 
     preservedChildren.forEach((childId) => {
@@ -306,7 +390,7 @@ function buildDirectTreeModel(component: ComponentSummary, entries: TreeEntry[])
   const typeRank: Record<TreeNodeType, number> = {
     root: -1,
     element: 0,
-    attribute: 1
+    attribute: 1,
   };
 
   Object.values(nodesById).forEach((node) => {
@@ -324,7 +408,7 @@ function buildDirectTreeModel(component: ComponentSummary, entries: TreeEntry[])
   return {
     rootId,
     nodesById,
-    pathToNodeId
+    pathToNodeId,
   };
 }
 
@@ -333,14 +417,15 @@ function buildExpandedTreeModel(
   directTreeByComponent: Record<string, TreeModel>,
   componentsById: Record<string, ComponentSummary>
 ): TreeModel {
-  const base = directTreeByComponent[selected.id] ?? buildDirectTreeModel(selected, []);
+  const base =
+    directTreeByComponent[selected.id] ?? buildDirectTreeModel(selected, []);
 
   const nodesById: Record<string, TreeNode> = {};
   Object.values(base.nodesById).forEach((node) => {
     nodesById[node.id] = {
       ...node,
       children: [...node.children],
-      contextComponentId: selected.id
+      contextComponentId: selected.id,
     };
   });
 
@@ -385,7 +470,7 @@ function buildExpandedTreeModel(
       path,
       parentId: parentNodeId,
       children: [],
-      contextComponentId
+      contextComponentId,
     };
 
     parentNode.children.push(id);
@@ -394,14 +479,25 @@ function buildExpandedTreeModel(
     }
 
     sourceNode.children.forEach((sourceChildId) => {
-      cloneSubtree(sourceTree, sourceChildId, id, contextComponentId, branchComponents, depth + 1);
+      cloneSubtree(
+        sourceTree,
+        sourceChildId,
+        id,
+        contextComponentId,
+        branchComponents,
+        depth + 1
+      );
     });
 
     expandReferences(id, branchComponents, depth + 1);
     return id;
   }
 
-  function expandReferences(nodeId: string, branchComponents: Set<string>, depth: number): void {
+  function expandReferences(
+    nodeId: string,
+    branchComponents: Set<string>,
+    depth: number
+  ): void {
     if (depth > MAX_REFERENCE_DEPTH) {
       return;
     }
@@ -425,7 +521,11 @@ function buildExpandedTreeModel(
       return;
     }
 
-    const targetComponentId = resolveTargetId(node.resolution, currentContextComponent, componentsById);
+    const targetComponentId = resolveTargetId(
+      node.resolution,
+      currentContextComponent,
+      componentsById
+    );
     if (!targetComponentId || branchComponents.has(targetComponentId)) {
       return;
     }
@@ -444,7 +544,14 @@ function buildExpandedTreeModel(
     }
 
     targetRoot.children.forEach((sourceChildId) => {
-      cloneSubtree(targetTree, sourceChildId, nodeId, targetComponentId, nextBranch, depth + 1);
+      cloneSubtree(
+        targetTree,
+        sourceChildId,
+        nodeId,
+        targetComponentId,
+        nextBranch,
+        depth + 1
+      );
     });
   }
 
@@ -454,7 +561,7 @@ function buildExpandedTreeModel(
   const typeRank: Record<TreeNodeType, number> = {
     root: -1,
     element: 0,
-    attribute: 1
+    attribute: 1,
   };
 
   Object.values(nodesById).forEach((node) => {
@@ -475,7 +582,7 @@ function buildExpandedTreeModel(
   return {
     rootId: base.rootId,
     nodesById,
-    pathToNodeId
+    pathToNodeId,
   };
 }
 
@@ -499,7 +606,7 @@ function TypeReferenceLink({
   current,
   componentsById,
   onSelect,
-  variantById
+  variantById,
 }: {
   raw: string;
   resolution: QNameResolution | null;
@@ -509,7 +616,7 @@ function TypeReferenceLink({
   variantById: Record<string, VariantMeta>;
 }) {
   if (!raw) {
-    return <span className="muted">anonymous</span>;
+    return <span className="code-pill anonymous">anonymous type</span>;
   }
 
   if (!resolution) {
@@ -536,11 +643,20 @@ function TypeReferenceLink({
   }
 
   const targetVariant = variantById[targetId];
-  const variantSuffix = targetVariant && targetVariant.total > 1 ? ` • variant ${targetVariant.position}/${targetVariant.total}` : "";
-  const ambiguitySuffix = resolution.ambiguous ? ` • ${resolution.targetIds.length} matches` : "";
+  const variantSuffix =
+    targetVariant && targetVariant.total > 1
+      ? ` • variant ${targetVariant.position}/${targetVariant.total}`
+      : "";
+  const ambiguitySuffix = resolution.ambiguous
+    ? ` • ${resolution.targetIds.length} matches`
+    : "";
 
   return (
-    <button className="type-link" onClick={() => onSelect(targetId)} title={`${target.name}${variantSuffix}${ambiguitySuffix}`}>
+    <button
+      className="type-link"
+      onClick={() => onSelect(targetId)}
+      title={`${target.name}${variantSuffix}${ambiguitySuffix}`}
+    >
       {resolution.raw}
       {resolution.ambiguous ? ` (${resolution.targetIds.length})` : ""}
     </button>
@@ -548,6 +664,9 @@ function TypeReferenceLink({
 }
 
 export function ExplorerApp() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [index, setIndex] = useState<XsdIndex | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [detailComponentId, setDetailComponentId] = useState<string>("");
@@ -558,7 +677,12 @@ export function ExplorerApp() {
   const [history, setHistory] = useState<NavState[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [activeTreeFieldId, setActiveTreeFieldId] = useState<string>("");
-  const [expandedNodeIds, setExpandedNodeIds] = useState<Record<string, boolean>>({});
+  const [expandedNodeIds, setExpandedNodeIds] = useState<
+    Record<string, boolean>
+  >({});
+  const [hasHydratedFromUrl, setHasHydratedFromUrl] = useState<boolean>(false);
+  const fieldRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const pendingUrlQueryRef = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -576,11 +700,6 @@ export function ExplorerApp() {
         }
 
         setIndex(payload);
-        const firstId = payload.components[0]?.id ?? "";
-        setDetailComponentId(firstId);
-        setTreeRootComponentId(firstId);
-        setHistory(firstId ? [{ detailId: firstId, treeRootId: firstId }] : []);
-        setHistoryIndex(firstId ? 0 : -1);
       } catch (err) {
         if (!active) {
           return;
@@ -616,8 +735,14 @@ export function ExplorerApp() {
 
     index.components.forEach((component) => {
       const entries: TreeEntry[] = [
-        ...component.elementFields.map((field) => ({ type: "element" as const, field })),
-        ...component.attributeFields.map((field) => ({ type: "attribute" as const, field }))
+        ...component.elementFields.map((field) => ({
+          type: "element" as const,
+          field,
+        })),
+        ...component.attributeFields.map((field) => ({
+          type: "attribute" as const,
+          field,
+        })),
       ];
       map[component.id] = buildDirectTreeModel(component, entries);
     });
@@ -632,8 +757,73 @@ export function ExplorerApp() {
     return buildVariantMap(index.components);
   }, [index]);
 
-  const selected = detailComponentId ? componentsById[detailComponentId] : undefined;
-  const treeRoot = treeRootComponentId ? componentsById[treeRootComponentId] : undefined;
+  const selected = detailComponentId
+    ? componentsById[detailComponentId]
+    : undefined;
+  const treeRoot = treeRootComponentId
+    ? componentsById[treeRootComponentId]
+    : undefined;
+
+  useEffect(() => {
+    if (!index) {
+      return;
+    }
+
+    const currentQuery = searchParams.toString();
+    if (
+      pendingUrlQueryRef.current !== null &&
+      pendingUrlQueryRef.current === currentQuery
+    ) {
+      pendingUrlQueryRef.current = null;
+      if (!hasHydratedFromUrl) {
+        setHasHydratedFromUrl(true);
+      }
+      return;
+    }
+
+    const defaultId = getDefaultComponentId(index.components);
+    const detailFromUrl = searchParams.get("component");
+    const rootFromUrl = searchParams.get("root");
+
+    const nextDetailId =
+      detailFromUrl && componentsById[detailFromUrl]
+        ? detailFromUrl
+        : defaultId;
+    const nextTreeRootId =
+      rootFromUrl && componentsById[rootFromUrl] ? rootFromUrl : nextDetailId;
+    const nextViewMode = parseViewMode(searchParams.get("view"));
+    const nextFilterMode = parseFilterMode(searchParams.get("filter"));
+    const nextSearch = searchParams.get("q") ?? "";
+    const nextActiveNodeId = searchParams.get("node") ?? "";
+
+    setDetailComponentId((current) =>
+      current === nextDetailId ? current : nextDetailId
+    );
+    setTreeRootComponentId((current) =>
+      current === nextTreeRootId ? current : nextTreeRootId
+    );
+    setViewMode((current) =>
+      current === nextViewMode ? current : nextViewMode
+    );
+    setFilterMode((current) =>
+      current === nextFilterMode ? current : nextFilterMode
+    );
+    setSearch((current) => (current === nextSearch ? current : nextSearch));
+    setActiveTreeFieldId((current) =>
+      current === nextActiveNodeId ? current : nextActiveNodeId
+    );
+
+    if (!hasHydratedFromUrl) {
+      if (nextDetailId) {
+        setHistory([{ detailId: nextDetailId, treeRootId: nextTreeRootId }]);
+        setHistoryIndex(0);
+      } else {
+        setHistory([]);
+        setHistoryIndex(-1);
+      }
+      setHasHydratedFromUrl(true);
+    }
+  }, [componentsById, hasHydratedFromUrl, index, searchParams]);
 
   const filteredComponents = useMemo(() => {
     if (!index) {
@@ -658,7 +848,7 @@ export function ExplorerApp() {
           component.docs.join(" "),
           component.elementFields.map((field) => field.path).join(" "),
           component.attributeFields.map((field) => field.path).join(" "),
-          component.enumerations.join(" ")
+          component.enumerations.join(" "),
         ]
           .join(" ")
           .toLowerCase();
@@ -681,7 +871,7 @@ export function ExplorerApp() {
     return Object.entries(groups)
       .map(([letter, items]) => ({
         letter,
-        items
+        items,
       }))
       .sort((a, b) => a.letter.localeCompare(b.letter));
   }, [filteredComponents]);
@@ -697,10 +887,57 @@ export function ExplorerApp() {
     if (!treeRootComponentId || !componentsById[treeRootComponentId]) {
       setTreeRootComponentId(fallbackId);
     }
-  }, [componentsById, detailComponentId, filteredComponents, treeRootComponentId]);
+  }, [
+    componentsById,
+    detailComponentId,
+    filteredComponents,
+    treeRootComponentId,
+  ]);
 
-  function navigateTo(detailId: string, trackHistory: boolean, resetTree: boolean): void {
-    const nextTreeRootId = resetTree ? detailId : treeRootComponentId || detailId;
+  useEffect(() => {
+    if (!index || !hasHydratedFromUrl) {
+      return;
+    }
+
+    const nextQuery = buildExplorerQueryString({
+      detailId: detailComponentId,
+      treeRootId: treeRootComponentId,
+      viewMode,
+      filterMode,
+      search,
+      activeNodeId: activeTreeFieldId,
+    });
+    const currentQuery = searchParams.toString();
+
+    if (nextQuery === currentQuery) {
+      return;
+    }
+
+    pendingUrlQueryRef.current = nextQuery;
+    const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [
+    activeTreeFieldId,
+    detailComponentId,
+    filterMode,
+    hasHydratedFromUrl,
+    index,
+    pathname,
+    router,
+    search,
+    searchParams,
+    treeRootComponentId,
+    viewMode,
+  ]);
+
+  function navigateTo(
+    detailId: string,
+    trackHistory: boolean,
+    resetTree: boolean
+  ): void {
+    const nextTreeRootId = resetTree
+      ? detailId
+      : treeRootComponentId || detailId;
 
     setDetailComponentId(detailId);
     if (resetTree) {
@@ -714,13 +951,21 @@ export function ExplorerApp() {
     setHistory((current) => {
       const base = current.slice(0, historyIndex + 1);
       const last = base[base.length - 1];
-      if (last && last.detailId === detailId && last.treeRootId === nextTreeRootId) {
+      if (
+        last &&
+        last.detailId === detailId &&
+        last.treeRootId === nextTreeRootId
+      ) {
         return base;
       }
       const next = [...base, { detailId, treeRootId: nextTreeRootId }];
       setHistoryIndex(next.length - 1);
       return next;
     });
+  }
+
+  function handleRightPaneClickCapture(): void {
+    setViewMode((current) => (current === "explorer" ? "tree" : current));
   }
 
   function navigateBack(): void {
@@ -752,14 +997,21 @@ export function ExplorerApp() {
   }
 
   const unresolvedReferences = selected
-    ? selected.references.filter((ref) => !ref.resolution.isBuiltin && ref.resolution.targetIds.length === 0)
+    ? selected.references.filter(
+        (ref) =>
+          !ref.resolution.isBuiltin && ref.resolution.targetIds.length === 0
+      )
     : [];
 
   const treeModel = useMemo(() => {
     if (!treeRoot) {
       return null as TreeModel | null;
     }
-    return buildExpandedTreeModel(treeRoot, directTreeByComponent, componentsById);
+    return buildExpandedTreeModel(
+      treeRoot,
+      directTreeByComponent,
+      componentsById
+    );
   }, [componentsById, directTreeByComponent, treeRoot]);
 
   useEffect(() => {
@@ -771,7 +1023,7 @@ export function ExplorerApp() {
 
     setExpandedNodeIds((current) => {
       const next: Record<string, boolean> = {
-        [treeModel.rootId]: true
+        [treeModel.rootId]: true,
       };
       Object.keys(current).forEach((id) => {
         if (treeModel.nodesById[id]) {
@@ -785,7 +1037,7 @@ export function ExplorerApp() {
       if (current && treeModel.nodesById[current]) {
         return current;
       }
-      return treeModel.nodesById[treeModel.rootId].children[0] || "";
+      return "";
     });
   }, [treeModel]);
 
@@ -797,7 +1049,7 @@ export function ExplorerApp() {
     setExpandedNodeIds((current) => {
       const next = {
         ...current,
-        [treeModel.rootId]: true
+        [treeModel.rootId]: true,
       };
       let cursor: string | null = nodeId;
       while (cursor) {
@@ -829,7 +1081,11 @@ export function ExplorerApp() {
     let nextDetailId = detailComponentId || node.contextComponentId;
     const contextComponent = componentsById[node.contextComponentId];
     if (node.resolution && contextComponent) {
-      const resolvedId = resolveTargetId(node.resolution, contextComponent, componentsById);
+      const resolvedId = resolveTargetId(
+        node.resolution,
+        contextComponent,
+        componentsById
+      );
       if (resolvedId) {
         nextDetailId = resolvedId;
       } else {
@@ -853,7 +1109,7 @@ export function ExplorerApp() {
 
     setExpandedNodeIds((current) => ({
       ...current,
-      [nodeId]: !current[nodeId]
+      [nodeId]: !current[nodeId],
     }));
   }
 
@@ -876,11 +1132,56 @@ export function ExplorerApp() {
       return;
     }
     setExpandedNodeIds({
-      [treeModel.rootId]: true
+      [treeModel.rootId]: true,
     });
   }
 
-  const activeTreeNode = treeModel && activeTreeFieldId ? treeModel.nodesById[activeTreeFieldId] : undefined;
+  const activeTreeNode =
+    treeModel && activeTreeFieldId
+      ? treeModel.nodesById[activeTreeFieldId]
+      : undefined;
+  const focusedFieldId = useMemo(() => {
+    if (!selected || !activeTreeNode) {
+      return "";
+    }
+    if (activeTreeNode.contextComponentId !== selected.id) {
+      return "";
+    }
+
+    const hasElementField = selected.elementFields.some(
+      (field) => field.id === activeTreeNode.id
+    );
+    if (hasElementField) {
+      return activeTreeNode.id;
+    }
+
+    const hasAttributeField = selected.attributeFields.some(
+      (field) => field.id === activeTreeNode.id
+    );
+    if (hasAttributeField) {
+      return activeTreeNode.id;
+    }
+
+    return "";
+  }, [activeTreeNode, selected]);
+
+  useEffect(() => {
+    if (!focusedFieldId) {
+      return;
+    }
+    const rafId = window.requestAnimationFrame(() => {
+      const target = fieldRowRefs.current[focusedFieldId];
+      if (!target) {
+        return;
+      }
+      target.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [focusedFieldId, selected?.id]);
 
   const treeBreadcrumbs = useMemo(() => {
     if (!treeModel || !treeRoot) {
@@ -897,7 +1198,7 @@ export function ExplorerApp() {
       crumbs.push({
         label: segment,
         path: cursor,
-        nodeId: treeModel.pathToNodeId[cursor] || null
+        nodeId: treeModel.pathToNodeId[cursor] || null,
       });
     });
     return crumbs;
@@ -925,7 +1226,10 @@ export function ExplorerApp() {
 
       return (
         <div key={childId}>
-          <div className="tree-row" style={{ marginLeft: `${Math.min(depth * 14, 140)}px` }}>
+          <div
+            className="tree-row"
+            style={{ marginLeft: `${Math.min(depth * 14, 140)}px` }}
+          >
             <button
               className={`tree-toggle ${hasChildren ? "" : "empty"}`}
               onClick={(event) => {
@@ -933,19 +1237,32 @@ export function ExplorerApp() {
                 toggleTreeNode(childId);
               }}
               disabled={!hasChildren}
-              aria-label={hasChildren ? `Toggle ${node.name}` : `${node.name} has no children`}
+              aria-label={
+                hasChildren
+                  ? `Toggle ${node.name}`
+                  : `${node.name} has no children`
+              }
             >
               {hasChildren ? (isExpanded ? "▾" : "▸") : "•"}
             </button>
-            <button className={`tree-node-btn ${isActive ? "active" : ""}`} onClick={() => selectTreeNode(childId)}>
-              <span className={`tree-kind ${node.type === "attribute" ? "attribute" : "element"}`}>
+            <button
+              className={`tree-node-btn ${isActive ? "active" : ""}`}
+              onClick={() => selectTreeNode(childId)}
+            >
+              <span
+                className={`tree-kind ${
+                  node.type === "attribute" ? "attribute" : "element"
+                }`}
+              >
                 {node.type === "attribute" ? "A" : "E"}
               </span>
               <span className="tree-name">{node.name}</span>
               <span className="tree-occurs">{node.occurrence}</span>
             </button>
           </div>
-          {hasChildren && isExpanded ? renderTreeRows(childId, depth + 1) : null}
+          {hasChildren && isExpanded
+            ? renderTreeRows(childId, depth + 1)
+            : null}
         </div>
       );
     });
@@ -958,7 +1275,8 @@ export function ExplorerApp() {
           <h2>Unable to load schema index</h2>
           <p>{loadError}</p>
           <p>
-            Run <code>npm run build:data</code> in this app directory to regenerate the index.
+            Run <code>npm run build:data</code> in this app directory to
+            regenerate the index.
           </p>
         </div>
       </main>
@@ -988,14 +1306,18 @@ export function ExplorerApp() {
         <div>
           <h1>XSD Explorer</h1>
           <p className="subtitle">
-            {index.summary.componentCount} objects • {index.summary.rootElementCount} top-level elements
+            {index.summary.componentCount} objects •{" "}
+            {index.summary.rootElementCount} top-level elements
           </p>
         </div>
         <div className="top-controls">
           <button onClick={navigateBack} disabled={historyIndex <= 0}>
             Back
           </button>
-          <button onClick={navigateForward} disabled={historyIndex >= history.length - 1}>
+          <button
+            onClick={navigateForward}
+            disabled={historyIndex >= history.length - 1}
+          >
             Forward
           </button>
         </div>
@@ -1004,44 +1326,73 @@ export function ExplorerApp() {
       {index.warnings.length > 0 && (
         <section className="warnings-banner" aria-label="warnings">
           <strong>{index.warnings.length} warning(s)</strong>
-          <span>Some references cannot be resolved because dependencies are missing. Browsing still works.</span>
+          <span>
+            Some references cannot be resolved because dependencies are missing.
+            Browsing still works.
+          </span>
         </section>
       )}
 
       <section className="workspace">
         <section className="pane pane-middle">
-          <div className="pane-title-row split">
-            <h2>Object Catalog</h2>
-            <div className="toggle-row">
-              <button className={viewMode === "explorer" ? "active" : ""} onClick={() => setViewMode("explorer")}>
-                Explorer
+          <div className="catalog-controls">
+            <div className="pane-title-row split">
+              <h2>Object Catalog</h2>
+              <div className="toggle-row">
+                <button
+                  className={viewMode === "explorer" ? "active" : ""}
+                  onClick={() => setViewMode("explorer")}
+                >
+                  Explorer
+                </button>
+                <button
+                  className={viewMode === "tree" ? "active" : ""}
+                  onClick={() => setViewMode("tree")}
+                >
+                  Tree view
+                </button>
+              </div>
+            </div>
+
+            <input
+              className="search"
+              placeholder="Search object names, fields, documentation, enumerations"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+
+            <div className="toggle-row filter-row">
+              <button
+                className={filterMode === "all" ? "active" : ""}
+                onClick={() => setFilterMode("all")}
+              >
+                All
               </button>
-              <button className={viewMode === "tree" ? "active" : ""} onClick={() => setViewMode("tree")}>
-                Tree view
+              <button
+                className={filterMode === "root" ? "active" : ""}
+                onClick={() => setFilterMode("root")}
+              >
+                Roots
+              </button>
+              <button
+                className={filterMode === "complex" ? "active" : ""}
+                onClick={() => setFilterMode("complex")}
+              >
+                Complex
+              </button>
+              <button
+                className={filterMode === "simple" ? "active" : ""}
+                onClick={() => setFilterMode("simple")}
+              >
+                Simple
+              </button>
+              <button
+                className={filterMode === "element" ? "active" : ""}
+                onClick={() => setFilterMode("element")}
+              >
+                Elements
               </button>
             </div>
-          </div>
-
-          <input
-            className="search"
-            placeholder="Search object names, fields, documentation, enumerations"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-
-          <div className="toggle-row filter-row">
-            <button className={filterMode === "all" ? "active" : ""} onClick={() => setFilterMode("all")}>
-              All
-            </button>
-            <button className={filterMode === "complex" ? "active" : ""} onClick={() => setFilterMode("complex")}>
-              Complex
-            </button>
-            <button className={filterMode === "simple" ? "active" : ""} onClick={() => setFilterMode("simple")}>
-              Simple
-            </button>
-            <button className={filterMode === "element" ? "active" : ""} onClick={() => setFilterMode("element")}>
-              Elements
-            </button>
           </div>
 
           {viewMode === "explorer" ? (
@@ -1051,25 +1402,40 @@ export function ExplorerApp() {
                   <h3 className="group-title">{group.letter}</h3>
                   <div className="group-items">
                     {group.items.map((component) => {
-                      const restrictionSummary = summarizeRestrictions(component.restrictions);
+                      const restrictionSummary = summarizeRestrictions(
+                        component.restrictions
+                      );
                       const variant = variantById[component.id];
                       return (
                         <button
                           key={component.id}
-                          className={`component-card ${detailComponentId === component.id ? "active" : ""}`}
+                          className={`component-card ${
+                            detailComponentId === component.id ? "active" : ""
+                          }`}
                           onClick={() => navigateTo(component.id, true, true)}
                         >
                           <div className="component-card-top">
-                            <span className={`kind-badge kind-${component.kind}`}>{kindLabel[component.kind]}</span>
+                            <span
+                              className={`kind-badge kind-${component.kind}`}
+                            >
+                              {kindLabel[component.kind]}
+                            </span>
                             {variant && variant.total > 1 && (
-                              <span className="variant-pill">Variant {variant.position}/{variant.total}</span>
+                              <span className="variant-pill">
+                                Variant {variant.position}/{variant.total}
+                              </span>
                             )}
                           </div>
                           <strong>{component.name}</strong>
                           <small>
-                            {component.elementFields.length} element field(s), {component.attributeFields.length} attribute(s)
+                            {component.elementFields.length} element field(s),{" "}
+                            {component.attributeFields.length} attribute(s)
                           </small>
-                          {restrictionSummary && <small className="muted">{restrictionSummary}</small>}
+                          {restrictionSummary && (
+                            <small className="muted">
+                              {restrictionSummary}
+                            </small>
+                          )}
                         </button>
                       );
                     })}
@@ -1096,13 +1462,20 @@ export function ExplorerApp() {
 
                   <div className="breadcrumbs" aria-label="tree-breadcrumbs">
                     {treeBreadcrumbs.map((crumb, index) => {
-                      const isActive = activeTreeNode?.path === crumb.path || (!activeTreeNode && crumb.path === treeRoot.name);
+                      const isActive =
+                        activeTreeNode?.path === crumb.path ||
+                        (!activeTreeNode && crumb.path === treeRoot.name);
                       return (
-                        <span key={`${crumb.path}-${index}`} className="crumb-wrap">
+                        <span
+                          key={`${crumb.path}-${index}`}
+                          className="crumb-wrap"
+                        >
                           {index > 0 && <span className="crumb-sep">/</span>}
                           {crumb.nodeId ? (
                             <button
-                              className={`crumb-btn ${isActive ? "active" : ""}`}
+                              className={`crumb-btn ${
+                                isActive ? "active" : ""
+                              }`}
                               onClick={() => {
                                 if (crumb.nodeId === treeModel?.rootId) {
                                   setActiveTreeFieldId("");
@@ -1122,24 +1495,28 @@ export function ExplorerApp() {
                     })}
                   </div>
 
-                  {activeTreeNode && activeTreeNode.type !== "root" && activeTreeContext && (
-                    <div className="tree-meta">
-                      <strong>{activeTreeNode.name}</strong>
-                      <span className="muted">{activeTreeNode.occurrence}</span>
-                      <TypeReferenceLink
-                        raw={activeTreeNode.rawTypeOrRef}
-                        resolution={activeTreeNode.resolution}
-                        current={activeTreeContext}
-                        componentsById={componentsById}
-                        onSelect={(id) => navigateTo(id, true, false)}
-                        variantById={variantById}
-                      />
-                    </div>
-                  )}
+                  {activeTreeNode &&
+                    activeTreeNode.type !== "root" &&
+                    activeTreeContext && (
+                      <div className="tree-meta">
+                        <strong>{activeTreeNode.name}</strong>
+                        <span className="muted">
+                          {activeTreeNode.occurrence}
+                        </span>
+                        <TypeReferenceLink
+                          raw={activeTreeNode.rawTypeOrRef}
+                          resolution={activeTreeNode.resolution}
+                          current={activeTreeContext}
+                          componentsById={componentsById}
+                          onSelect={(id) => navigateTo(id, true, false)}
+                          variantById={variantById}
+                        />
+                      </div>
+                    )}
 
-                  {treeModel && treeModel.nodesById[treeModel.rootId].children.length === 0 && (
-                    <p className="muted">No sub-fields declared.</p>
-                  )}
+                  {treeModel &&
+                    treeModel.nodesById[treeModel.rootId].children.length ===
+                      0 && <p className="muted">No sub-fields declared.</p>}
 
                   {treeModel ? renderTreeRows(treeModel.rootId, 0) : null}
                 </>
@@ -1148,7 +1525,10 @@ export function ExplorerApp() {
           )}
         </section>
 
-        <section className="pane pane-right">
+        <section
+          className="pane pane-right"
+          onClickCapture={handleRightPaneClickCapture}
+        >
           {!selected ? (
             <div className="empty-state">
               <h2>Type Definition</h2>
@@ -1163,12 +1543,19 @@ export function ExplorerApp() {
               <div className="definition-card">
                 <div className="definition-head">
                   <h3>{selected.name}</h3>
-                  <span className={`kind-badge kind-${selected.kind}`}>{kindLabel[selected.kind]}</span>
+                  <span className={`kind-badge kind-${selected.kind}`}>
+                    {kindLabel[selected.kind]}
+                  </span>
                 </div>
                 {selectedVariant && selectedVariant.total > 1 && (
-                  <p className="muted">Variant {selectedVariant.position} of {selectedVariant.total}</p>
+                  <p className="muted">
+                    Variant {selectedVariant.position} of{" "}
+                    {selectedVariant.total}
+                  </p>
                 )}
-                {selected.namespace && <p className="muted">Namespace: {selected.namespace}</p>}
+                {selected.namespace && (
+                  <p className="muted">Namespace: {selected.namespace}</p>
+                )}
               </div>
 
               {renderDocList(selected.docs)}
@@ -1193,7 +1580,8 @@ export function ExplorerApp() {
                   <ul>
                     {unresolvedReferences.map((ref, index) => (
                       <li key={`${ref.rawValue}-${index}`}>
-                        Could not resolve <code>{ref.rawValue}</code> in <code>{ref.context}</code>
+                        Could not resolve <code>{ref.rawValue}</code> in{" "}
+                        <code>{ref.context}</code>
                       </li>
                     ))}
                   </ul>
@@ -1216,9 +1604,22 @@ export function ExplorerApp() {
                     </thead>
                     <tbody>
                       {selected.elementFields.map((field) => (
-                        <tr key={field.id}>
+                        <tr
+                          key={field.id}
+                          ref={(node) => {
+                            fieldRowRefs.current[field.id] = node;
+                          }}
+                          className={
+                            focusedFieldId === field.id
+                              ? "focused-field-row"
+                              : ""
+                          }
+                        >
                           <td>
-                            <div className="field-name" style={{ marginLeft: `${field.depth * 12}px` }}>
+                            <div
+                              className="field-name"
+                              style={{ marginLeft: `${field.depth * 12}px` }}
+                            >
                               {field.name}
                             </div>
                             <small className="muted mono">{field.path}</small>
@@ -1235,9 +1636,18 @@ export function ExplorerApp() {
                             />
                           </td>
                           <td>
-                            {field.documentation && <p>{field.documentation}</p>}
+                            {field.documentation && (
+                              <p>{field.documentation}</p>
+                            )}
+                            {!field.rawTypeOrRef && (
+                              <small className="muted anonymous-note">
+                                Anonymous inline type.
+                              </small>
+                            )}
                             {summarizeRestrictions(field.restrictions) && (
-                              <small className="muted">{summarizeRestrictions(field.restrictions)}</small>
+                              <small className="muted">
+                                {summarizeRestrictions(field.restrictions)}
+                              </small>
                             )}
                           </td>
                         </tr>
@@ -1263,9 +1673,22 @@ export function ExplorerApp() {
                     </thead>
                     <tbody>
                       {selected.attributeFields.map((field) => (
-                        <tr key={field.id}>
+                        <tr
+                          key={field.id}
+                          ref={(node) => {
+                            fieldRowRefs.current[field.id] = node;
+                          }}
+                          className={
+                            focusedFieldId === field.id
+                              ? "focused-field-row"
+                              : ""
+                          }
+                        >
                           <td>
-                            <div className="field-name" style={{ marginLeft: `${field.depth * 12}px` }}>
+                            <div
+                              className="field-name"
+                              style={{ marginLeft: `${field.depth * 12}px` }}
+                            >
                               @{field.name}
                             </div>
                             <small className="muted mono">{field.path}</small>
@@ -1282,9 +1705,18 @@ export function ExplorerApp() {
                             />
                           </td>
                           <td>
-                            {field.documentation && <p>{field.documentation}</p>}
+                            {field.documentation && (
+                              <p>{field.documentation}</p>
+                            )}
+                            {!field.rawTypeOrRef && (
+                              <small className="muted anonymous-note">
+                                Anonymous inline type.
+                              </small>
+                            )}
                             {summarizeRestrictions(field.restrictions) && (
-                              <small className="muted">{summarizeRestrictions(field.restrictions)}</small>
+                              <small className="muted">
+                                {summarizeRestrictions(field.restrictions)}
+                              </small>
                             )}
                           </td>
                         </tr>
@@ -1294,7 +1726,8 @@ export function ExplorerApp() {
                 )}
               </section>
 
-              {(selected.enumerations.length > 0 || Object.keys(selected.restrictions.facets).length > 0) && (
+              {(selected.enumerations.length > 0 ||
+                Object.keys(selected.restrictions.facets).length > 0) && (
                 <section className="definition-section">
                   <h4>Restrictions</h4>
                   {selected.restrictions.base && (
@@ -1304,11 +1737,13 @@ export function ExplorerApp() {
                   )}
                   {Object.keys(selected.restrictions.facets).length > 0 && (
                     <div className="chips">
-                      {Object.entries(selected.restrictions.facets).map(([facet, value]) => (
-                        <span key={`${facet}-${value}`} className="chip">
-                          {facet}: {value}
-                        </span>
-                      ))}
+                      {Object.entries(selected.restrictions.facets).map(
+                        ([facet, value]) => (
+                          <span key={`${facet}-${value}`} className="chip">
+                            {facet}: {value}
+                          </span>
+                        )
+                      )}
                     </div>
                   )}
                   {selected.enumerations.length > 0 && (
@@ -1337,13 +1772,25 @@ export function ExplorerApp() {
                       const sourceVariant = variantById[source.id];
                       return (
                         <li key={`${edge.sourceId}-${index}`}>
-                          <button className="link-btn" onClick={() => navigateTo(edge.sourceId, true, true)}>
+                          <button
+                            className="link-btn"
+                            onClick={() =>
+                              navigateTo(edge.sourceId, true, true)
+                            }
+                          >
                             {source.name}
                           </button>
                           {sourceVariant && sourceVariant.total > 1 && (
-                            <span className="muted"> (variant {sourceVariant.position}/{sourceVariant.total})</span>
+                            <span className="muted">
+                              {" "}
+                              (variant {sourceVariant.position}/
+                              {sourceVariant.total})
+                            </span>
                           )}
-                          <span className="muted"> via {edge.attrName} = {edge.rawValue}</span>
+                          <span className="muted">
+                            {" "}
+                            via {edge.attrName} = {edge.rawValue}
+                          </span>
                         </li>
                       );
                     })}
