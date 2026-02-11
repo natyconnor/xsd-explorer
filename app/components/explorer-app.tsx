@@ -35,6 +35,7 @@ type TreeNodeType = "root" | "element" | "attribute";
 
 type TreeNode = {
   id: string;
+  fieldId: string;
   path: string;
   name: string;
   type: TreeNodeType;
@@ -202,6 +203,16 @@ function splitPath(path: string): string[] {
     .filter(Boolean);
 }
 
+function extractFieldIdsFromNodeId(nodeId: string): string[] {
+  const matches = nodeId.match(
+    /schema-[^:]+:(?:element|complexType|simpleType|attribute|attributeGroup|group):[^:]+:\d+:(?:element|attribute)-field:\d+/g
+  );
+  if (!matches) {
+    return [];
+  }
+  return matches;
+}
+
 function toAlphaGroup(name: string): string {
   const initial = (name || "").slice(0, 1).toUpperCase();
   if (!initial) {
@@ -266,6 +277,7 @@ function buildDirectTreeModel(
   const nodesById: Record<string, TreeNode> = {
     [rootId]: {
       id: rootId,
+      fieldId: "",
       path: rootPath,
       name: component.name,
       type: "root",
@@ -305,6 +317,7 @@ function buildDirectTreeModel(
       const syntheticId = `synthetic:${component.id}:${cursorPath}`;
       nodesById[syntheticId] = {
         id: syntheticId,
+        fieldId: "",
         path: cursorPath,
         name: segments[index],
         type: segments[index].startsWith("@") ? "attribute" : "element",
@@ -357,6 +370,7 @@ function buildDirectTreeModel(
 
     nodesById[newId] = {
       id: newId,
+      fieldId: field.id,
       path: normalizedPath,
       name: field.name,
       type: entry.type,
@@ -1001,6 +1015,21 @@ export function ExplorerApp() {
       )
     : [];
 
+  const elementPathsWithChildren = useMemo(() => {
+    const paths = new Set<string>();
+    if (!selected) {
+      return paths;
+    }
+    selected.elementFields.forEach((field) => {
+      let cursor = field.path;
+      while (cursor.includes("/")) {
+        cursor = cursor.slice(0, cursor.lastIndexOf("/"));
+        paths.add(cursor);
+      }
+    });
+    return paths;
+  }, [selected]);
+
   const treeModel = useMemo(() => {
     if (!treeRoot) {
       return null as TreeModel | null;
@@ -1076,7 +1105,7 @@ export function ExplorerApp() {
       return;
     }
 
-    let nextDetailId = detailComponentId || node.contextComponentId;
+    let nextDetailId = node.contextComponentId || detailComponentId;
     const contextComponent = componentsById[node.contextComponentId];
     if (node.resolution && contextComponent) {
       const resolvedId = resolveTargetId(
@@ -1085,7 +1114,12 @@ export function ExplorerApp() {
         componentsById
       );
       if (resolvedId) {
-        nextDetailId = resolvedId;
+        const hasInlineChildren = node.children.some((childId) => {
+          const child = treeModel.nodesById[childId];
+          return child?.contextComponentId === node.contextComponentId;
+        });
+        const opensOwnDetailPage = node.type !== "attribute" && !hasInlineChildren;
+        nextDetailId = opensOwnDetailPage ? resolvedId : node.contextComponentId;
       } else {
         nextDetailId = node.contextComponentId;
       }
@@ -1142,22 +1176,34 @@ export function ExplorerApp() {
     if (!selected || !activeTreeNode) {
       return "";
     }
-    if (activeTreeNode.contextComponentId !== selected.id) {
-      return "";
-    }
 
-    const hasElementField = selected.elementFields.some(
-      (field) => field.id === activeTreeNode.id
-    );
-    if (hasElementField) {
-      return activeTreeNode.id;
+    const candidateIds = new Set<string>();
+    if (activeTreeNode.fieldId) {
+      candidateIds.add(activeTreeNode.fieldId);
     }
+    candidateIds.add(activeTreeNode.id);
 
-    const hasAttributeField = selected.attributeFields.some(
-      (field) => field.id === activeTreeNode.id
-    );
-    if (hasAttributeField) {
-      return activeTreeNode.id;
+    const extracted = extractFieldIdsFromNodeId(activeTreeNode.id);
+    extracted.forEach((id) => {
+      if (id.startsWith(`${selected.id}:`)) {
+        candidateIds.add(id);
+      }
+    });
+
+    for (const candidateId of candidateIds) {
+      const hasElementField = selected.elementFields.some(
+        (field) => field.id === candidateId
+      );
+      if (hasElementField) {
+        return candidateId;
+      }
+
+      const hasAttributeField = selected.attributeFields.some(
+        (field) => field.id === candidateId
+      );
+      if (hasAttributeField) {
+        return candidateId;
+      }
     }
 
     return "";
@@ -1297,6 +1343,13 @@ export function ExplorerApp() {
     activeTreeNode && componentsById[activeTreeNode.contextComponentId]
       ? componentsById[activeTreeNode.contextComponentId]
       : selected;
+  const activeTreeNodeHasInlineChildren =
+    !!activeTreeNode &&
+    !!treeModel &&
+    activeTreeNode.children.some((childId) => {
+      const child = treeModel.nodesById[childId];
+      return child?.contextComponentId === activeTreeNode.contextComponentId;
+    });
 
   return (
     <main className="page">
@@ -1359,38 +1412,40 @@ export function ExplorerApp() {
               onChange={(event) => setSearch(event.target.value)}
             />
 
-            <div className="toggle-row filter-row">
-              <button
-                className={filterMode === "all" ? "active" : ""}
-                onClick={() => setFilterMode("all")}
-              >
-                All
-              </button>
-              <button
-                className={filterMode === "root" ? "active" : ""}
-                onClick={() => setFilterMode("root")}
-              >
-                Roots
-              </button>
-              <button
-                className={filterMode === "complex" ? "active" : ""}
-                onClick={() => setFilterMode("complex")}
-              >
-                Complex
-              </button>
-              <button
-                className={filterMode === "simple" ? "active" : ""}
-                onClick={() => setFilterMode("simple")}
-              >
-                Simple
-              </button>
-              <button
-                className={filterMode === "element" ? "active" : ""}
-                onClick={() => setFilterMode("element")}
-              >
-                Elements
-              </button>
-            </div>
+            {viewMode === "explorer" && (
+              <div className="toggle-row filter-row">
+                <button
+                  className={filterMode === "all" ? "active" : ""}
+                  onClick={() => setFilterMode("all")}
+                >
+                  All
+                </button>
+                <button
+                  className={filterMode === "root" ? "active" : ""}
+                  onClick={() => setFilterMode("root")}
+                >
+                  Roots
+                </button>
+                <button
+                  className={filterMode === "complex" ? "active" : ""}
+                  onClick={() => setFilterMode("complex")}
+                >
+                  Complex
+                </button>
+                <button
+                  className={filterMode === "simple" ? "active" : ""}
+                  onClick={() => setFilterMode("simple")}
+                >
+                  Simple
+                </button>
+                <button
+                  className={filterMode === "element" ? "active" : ""}
+                  onClick={() => setFilterMode("element")}
+                >
+                  Elements
+                </button>
+              </div>
+            )}
           </div>
 
           {viewMode === "explorer" ? (
@@ -1509,6 +1564,12 @@ export function ExplorerApp() {
                           onSelect={(id) => navigateTo(id, true, false)}
                           variantById={variantById}
                         />
+                        {activeTreeNodeHasInlineChildren &&
+                          activeTreeNode.rawTypeOrRef && (
+                            <span className="muted">
+                              Inherits this type and adds inline fields below.
+                            </span>
+                          )}
                       </div>
                     )}
 
@@ -1637,6 +1698,14 @@ export function ExplorerApp() {
                             {field.documentation && (
                               <p>{field.documentation}</p>
                             )}
+                            {elementPathsWithChildren.has(field.path) &&
+                              field.rawTypeOrRef && (
+                                <small className="muted anonymous-note">
+                                  Inline definition extends{" "}
+                                  <code>{field.rawTypeOrRef}</code> and adds
+                                  nested fields.
+                                </small>
+                              )}
                             {!field.rawTypeOrRef && (
                               <small className="muted anonymous-note">
                                 Anonymous inline type.
