@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import type {
   AttributeField,
@@ -276,7 +277,7 @@ function buildDirectTreeModel(component: ComponentSummary, entries: TreeEntry[])
       path: normalizedPath,
       name: field.name,
       type: entry.type,
-      occurrence: entry.type === "element" ? field.occurrence : field.use,
+      occurrence: entry.type === "element" ? entry.field.occurrence : entry.field.use,
       rawTypeOrRef: field.rawTypeOrRef,
       resolution: field.resolution,
       documentation: field.documentation,
@@ -800,7 +801,7 @@ export function ExplorerApp() {
       };
       let cursor: string | null = nodeId;
       while (cursor) {
-        const node = treeModel.nodesById[cursor];
+        const node: TreeNode | undefined = treeModel.nodesById[cursor];
         if (!node) {
           break;
         }
@@ -902,7 +903,7 @@ export function ExplorerApp() {
     return crumbs;
   }, [activeTreeNode, treeModel, treeRoot]);
 
-  function renderTreeRows(parentId: string, depth: number): JSX.Element[] {
+  function renderTreeRows(parentId: string, depth: number): ReactElement[] {
     if (!treeModel) {
       return [];
     }
@@ -1108,7 +1109,7 @@ export function ExplorerApp() {
                                   navigateTo(treeRoot.id, true, false);
                                   return;
                                 }
-                                selectTreeNode(crumb.nodeId);
+                                if (crumb.nodeId) selectTreeNode(crumb.nodeId);
                               }}
                             >
                               {crumb.label}
