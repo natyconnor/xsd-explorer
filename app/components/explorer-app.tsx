@@ -1567,7 +1567,6 @@ export function ExplorerApp() {
                           <button
                             type="button"
                             className={`component-tree-shortcut ${
-                              viewMode === "tree" &&
                               treeRootComponentId === component.id
                                 ? "active"
                                 : ""
